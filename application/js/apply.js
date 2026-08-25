@@ -120,11 +120,34 @@
     finish();
   });
 
+  const withAutoplay = (url) => {
+    const parsed = new URL(url, window.location.href);
+    parsed.searchParams.set("autoplay", "1");
+    return parsed.toString();
+  };
+
+  document.querySelectorAll("img[data-fallback]").forEach((img) => {
+    img.addEventListener("error", () => {
+      if (img.dataset.fallback && img.src !== img.dataset.fallback) {
+        img.src = img.dataset.fallback;
+      }
+    });
+  });
+
+  const logo = document.getElementById("logo-img");
+  const wordmark = document.querySelector(".wordmark");
+  if (logo && wordmark) {
+    logo.addEventListener("error", () => {
+      logo.hidden = true;
+      wordmark.hidden = false;
+    });
+  }
+
   document.querySelectorAll(".video-card[data-embed]").forEach((card) => {
     card.addEventListener("click", () => {
       if (card.classList.contains("is-playing")) return;
       const iframe = document.createElement("iframe");
-      iframe.src = card.dataset.embed;
+      iframe.src = withAutoplay(card.dataset.embed);
       iframe.title = card.dataset.title || "Client testimonial";
       iframe.allow =
         "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";

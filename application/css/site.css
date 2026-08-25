@@ -126,14 +126,31 @@ select {
   gap: 1rem;
   min-height: 4rem;
   padding: 0.65rem 1.15rem;
-  background: rgba(5, 5, 5, 0.92);
+  background: rgba(10, 10, 10, 0.94);
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(12px);
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
 }
 
 .logo img {
   width: auto;
   height: 1.85rem;
+}
+
+.wordmark {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+
+.wordmark span + span {
+  color: var(--red);
 }
 
 .nav-apply {
@@ -143,6 +160,7 @@ select {
   padding: 0.4rem 0.95rem;
   border: 1px solid var(--red);
   border-radius: 999px;
+  background: var(--red);
   color: #fff;
   text-decoration: none;
   font-weight: 700;
@@ -151,7 +169,8 @@ select {
 
 .nav-apply:hover,
 .nav-apply:focus-visible {
-  background: var(--red);
+  background: var(--red-deep);
+  border-color: var(--red-deep);
 }
 
 .hero {
