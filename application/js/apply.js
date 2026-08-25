@@ -10,6 +10,7 @@
   const progressLabel = document.getElementById("progress-label");
   const progressBar = document.getElementById("progress-bar");
   const progressFill = document.getElementById("progress-fill");
+  const progress = document.querySelector(".progress");
   const steps = Array.from(form.querySelectorAll(".step"));
 
   let current = 1;
@@ -91,6 +92,7 @@
 
   const finish = () => {
     form.hidden = true;
+    if (progress) progress.hidden = true;
     done.hidden = false;
     done.setAttribute("tabindex", "-1");
     done.focus({ preventScroll: true });

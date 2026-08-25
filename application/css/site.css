@@ -48,6 +48,10 @@ img {
   height: auto;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 a {
   color: var(--red);
 }
@@ -311,7 +315,6 @@ select {
 }
 
 .video-card {
-  position: relative;
   display: block;
   padding: 0;
   overflow: hidden;
@@ -321,6 +324,11 @@ select {
   color: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.video-thumb {
+  position: relative;
+  display: block;
 }
 
 .video-card img,
@@ -337,7 +345,7 @@ select {
 
 .play {
   position: absolute;
-  top: calc(50% - 2.1rem);
+  top: 50%;
   left: 50%;
   width: 3.2rem;
   height: 3.2rem;
