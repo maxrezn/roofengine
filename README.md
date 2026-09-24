@@ -38,11 +38,13 @@ python3 scripts/enrich_fresno_prospect.py \
 
 The script prints one JSON object per run: batch id, credits charged, and a match row with legal name, jurisdiction, registration number, registry status, and people (name, title, role).
 
-California registry search (active entities, filtered to `us_ca`):
+California company search stays on `us_ca`. A live check of `POST /v2/companies/search` with `{"q":"Buzz Oates","jurisdictions":"us_ca","limit":1}` returned 200. Company records use `legal_name` (not `name`), plus `jurisdiction_code`, `entity_number`, `status`, `addresses`, and `parties`. That call's first hit was BUZZ OATES DEVELOPMENT, L.P. (`us_ca` / `200105100029`, active).
 
 ```bash
-python3 scripts/enrich_fresno_prospect.py --mode search --name "Fresno Metal Warehouse"
+python3 scripts/enrich_fresno_prospect.py --mode search --name "Buzz Oates" --limit 1
 ```
+
+The search summary prints `legal_name`, `jurisdiction_code`, `entity_number`, `status`, `addresses`, and `parties`. Ownership matching is still the path that turns a Fresno street address into an operator and principals.
 
 Credit balance:
 
@@ -71,7 +73,7 @@ summary = enrich_prospect(
 
 | Method | Endpoint |
 | --- | --- |
-| `search_companies` | `POST /v2/companies/search` (default `jurisdictions="us_ca"`) |
+| `search_companies` | `POST /v2/companies/search` (default `jurisdictions="us_ca"`; company field is `legal_name`) |
 | `get_company` | `GET /v2/companies/{jurisdiction_code}/{entity_number}` |
 | `create_local_business_batch` | `POST /v2/local-businesses/batches` |
 | `get_local_business_batch` / `poll_local_business_batch` | `GET /v2/local-businesses/batches/{batch_id}` |

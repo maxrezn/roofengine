@@ -78,18 +78,30 @@ class CreditBalance(TypedDict):
     auto_topup_target_credits: int | None
 
 
-class CompanySearchRequest(TypedDict, total=False):
-    q: str
-    match_alternative_names: bool
-    match_previous_names: bool
-    jurisdictions: str
+class CompanyEntity(TypedDict, total=False):
+    """Company record returned by search and lookup.
+
+    The legal name lives on ``legal_name``. There is no ``name`` field on
+    this object. ``match.matched_field`` may still be ``"name"`` when the
+    query hit the legal name.
+    """
+
+    kind: str
+    jurisdiction_code: str
+    entity_number: str
+    legal_name: str
     status: str
-    order_by: str
-    limit: int
-    page: int
+    status_raw: str | None
+    legal_form: str
+    legal_form_raw: str | None
+    domicile: str
+    addresses: dict[str, Any] | None
+    parties: list[dict[str, Any]] | None
 
 
 class LocalBusinessLocation(TypedDict, total=False):
+    """Ownership-batch input. This endpoint's business label is ``name``."""
+
     customer_record_id: str
     name: str
     address: str
@@ -134,17 +146,23 @@ class GovFilesClient:
         jurisdictions: str = CALIFORNIA_JURISDICTION,
         limit: int = 10,
         page: int = 1,
-        status: str = "any",
-        order_by: str = "relevance",
-        match_alternative_names: bool = True,
-        match_previous_names: bool = True,
+        status: str | None = None,
+        order_by: str | None = None,
+        match_alternative_names: bool | None = None,
+        match_previous_names: bool | None = None,
     ) -> dict[str, Any]:
         """POST ``/v2/companies/search``.
 
         ``jurisdictions`` defaults to California (``us_ca``). Pass ``"all"``
         or a comma-separated list such as ``"us_ca,us_nv"`` to widen the search.
-        ``order_by="relevance"`` ranks name matches for outreach; the API's
-        own default is ``jurisdiction``.
+        Each result's company object uses ``legal_name`` (not ``name``), plus
+        ``jurisdiction_code``, ``entity_number``, ``status``, ``addresses``,
+        and ``parties``.
+
+        Optional filters are omitted unless set, so a call with ``q``,
+        ``jurisdictions``, and ``limit`` matches the verified request body.
+        Pass ``order_by="relevance"`` to rank name matches, or
+        ``status="active"`` to drop inactive filings.
         """
 
         query = q.strip()
@@ -158,16 +176,21 @@ class GovFilesClient:
         if not jurisdiction_filter:
             raise ValueError("jurisdictions is required")
 
-        body: CompanySearchRequest = {
+        body: dict[str, Any] = {
             "q": query,
             "jurisdictions": jurisdiction_filter,
             "limit": limit,
-            "page": page,
-            "status": status,
-            "order_by": order_by,
-            "match_alternative_names": match_alternative_names,
-            "match_previous_names": match_previous_names,
         }
+        if page != 1:
+            body["page"] = page
+        if status is not None:
+            body["status"] = status
+        if order_by is not None:
+            body["order_by"] = order_by
+        if match_alternative_names is not None:
+            body["match_alternative_names"] = match_alternative_names
+        if match_previous_names is not None:
+            body["match_previous_names"] = match_previous_names
         return self._request("POST", "/v2/companies/search", body)
 
     def get_company(self, jurisdiction_code: str, entity_number: str) -> dict[str, Any]:

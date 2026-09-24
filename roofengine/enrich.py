@@ -11,8 +11,9 @@ from typing import Any, Mapping
 
 from roofengine.govfiles import CALIFORNIA_JURISDICTION, GovFilesClient
 
-# Fictional prospect used by the dry-run example. A live run sends this
-# name and address only when the caller does not pass their own.
+# Fictional prospect used by the dry-run ownership example. A live run sends
+# this name and address only when the caller does not pass their own.
+# Address-to-owner resolution stays on POST /v2/local-businesses/batches.
 FRESNO_MSA_EXAMPLE: dict[str, str] = {
     "customer_record_id": "fresno-msa-example",
     "name": "Fresno Metal Warehouse",
@@ -20,6 +21,19 @@ FRESNO_MSA_EXAMPLE: dict[str, str] = {
     "city": "Fresno",
     "state": "CA",
     "postal_code": "93726",
+}
+
+# Verified live against POST /v2/companies/search with
+# {"q":"Buzz Oates","jurisdictions":"us_ca","limit":1}.
+# The company object field is legal_name, not name.
+CALIFORNIA_SEARCH_EXAMPLE: dict[str, str | int] = {
+    "q": "Buzz Oates",
+    "jurisdictions": CALIFORNIA_JURISDICTION,
+    "limit": 1,
+    "legal_name": "BUZZ OATES DEVELOPMENT, L.P.",
+    "jurisdiction_code": "us_ca",
+    "entity_number": "200105100029",
+    "status": "active",
 }
 
 
@@ -119,6 +133,42 @@ def search_california_companies(
         status=status,
         order_by="relevance",
     )
+
+
+def summarize_company_search(response: Mapping[str, Any]) -> dict[str, Any]:
+    """Project a company-search response onto the verified company fields.
+
+    Reads ``results[].company.legal_name``. A ``name`` key on the company
+    object is ignored; party records still use ``name`` for the person.
+    """
+
+    companies = [
+        _summarize_company(result.get("company") or {}, result.get("match") or {})
+        for result in response.get("results") or []
+    ]
+    summary = response.get("summary") or {}
+    request = response.get("request") or {}
+    return {
+        "query": request.get("query"),
+        "jurisdictions": request.get("jurisdictions") or CALIFORNIA_JURISDICTION,
+        "returned": summary.get("returned", len(companies)),
+        "total_matches": summary.get("total_matches"),
+        "next_page": summary.get("next_page"),
+        "companies": companies,
+    }
+
+
+def _summarize_company(company: Mapping[str, Any], match: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "legal_name": company.get("legal_name"),
+        "jurisdiction_code": company.get("jurisdiction_code"),
+        "entity_number": company.get("entity_number"),
+        "status": company.get("status"),
+        "addresses": company.get("addresses"),
+        "parties": company.get("parties") or [],
+        "matched_field": match.get("matched_field"),
+        "matched_value": match.get("matched_value"),
+    }
 
 
 def summarize_ownership(batch: Mapping[str, Any]) -> dict[str, Any]:

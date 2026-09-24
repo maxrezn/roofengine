@@ -19,9 +19,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from roofengine.enrich import (  # noqa: E402
+    CALIFORNIA_SEARCH_EXAMPLE,
     FRESNO_MSA_EXAMPLE,
     enrich_prospect,
     format_us_address,
+    summarize_company_search,
     summarize_ownership,
 )
 from roofengine.govfiles import (  # noqa: E402
@@ -33,7 +35,7 @@ from roofengine.govfiles import (  # noqa: E402
     GovFilesConfigError,
     GovFilesTimeout,
 )
-from scripts.enrich_fresno_prospect import dry_run_payload, main  # noqa: E402
+from scripts.enrich_fresno_prospect import main  # noqa: E402
 
 
 class RecordingTransport:
@@ -84,9 +86,29 @@ class GovFilesClientTests(unittest.TestCase):
         self.assertEqual(call["body"]["q"], "metal warehouse")
         self.assertEqual(call["body"]["jurisdictions"], CALIFORNIA_JURISDICTION)
         self.assertEqual(call["body"]["limit"], 5)
-        self.assertEqual(call["body"]["order_by"], "relevance")
+        self.assertEqual(set(call["body"]), {"q", "jurisdictions", "limit"})
         self.assertNotIn("test-key", call["url"])
         self.assertNotIn("test-key", json.dumps(call["body"]))
+
+    def test_search_companies_sends_optional_filters_when_set(self):
+        client, transport = client_with([{"results": []}])
+        client.search_companies(
+            "Buzz Oates",
+            jurisdictions="us_ca",
+            limit=1,
+            status="active",
+            order_by="relevance",
+        )
+        self.assertEqual(
+            transport.calls[0]["body"],
+            {
+                "q": "Buzz Oates",
+                "jurisdictions": "us_ca",
+                "limit": 1,
+                "status": "active",
+                "order_by": "relevance",
+            },
+        )
 
     def test_get_company_encodes_path_segments(self):
         client, transport = client_with([{"legal_name": "ACME"}])
@@ -298,16 +320,53 @@ class EnrichmentTests(unittest.TestCase):
         self.assertIn("/v2/local-businesses/batches", completed.stdout)
         self.assertNotIn("gf_" + "live_", completed.stdout)
 
-    def test_dry_run_search_uses_california_filter(self):
+    def test_company_search_summary_uses_legal_name(self):
+        example = CALIFORNIA_SEARCH_EXAMPLE
+        summary = summarize_company_search(
+            {
+                "request": {"query": example["q"], "jurisdictions": "us_ca"},
+                "summary": {"returned": 1, "total_matches": 1, "next_page": None},
+                "results": [
+                    {
+                        "match": {
+                            "matched_field": "name",
+                            "matched_value": example["legal_name"],
+                        },
+                        "company": {
+                            "legal_name": example["legal_name"],
+                            "name": "not the company field",
+                            "jurisdiction_code": example["jurisdiction_code"],
+                            "entity_number": example["entity_number"],
+                            "status": example["status"],
+                            "addresses": {"headquarters": {"locality": "STOCKTON", "region": "CA"}},
+                            "parties": [{"type": "person", "name": "EXAMPLE PRINCIPAL", "roles": []}],
+                        },
+                    }
+                ],
+            }
+        )
+        company = summary["companies"][0]
+        self.assertEqual(company["legal_name"], "BUZZ OATES DEVELOPMENT, L.P.")
+        self.assertEqual(company["jurisdiction_code"], "us_ca")
+        self.assertEqual(company["entity_number"], "200105100029")
+        self.assertEqual(company["status"], "active")
+        self.assertEqual(company["addresses"]["headquarters"]["region"], "CA")
+        self.assertEqual(company["parties"][0]["name"], "EXAMPLE PRINCIPAL")
+        self.assertNotEqual(company["legal_name"], "not the company field")
+
+    def test_dry_run_search_matches_verified_california_request(self):
         with mock.patch.dict(os.environ, {API_KEY_ENV: ""}, clear=False):
             os.environ.pop(API_KEY_ENV, None)
-            with redirect_stdout(io.StringIO()):
-                code = main(["--mode", "search", "--name", "warehouse"])
+            with redirect_stdout(io.StringIO()) as stdout:
+                code = main(["--mode", "search"])
         self.assertEqual(code, 0)
-        payload = dry_run_payload(
-            type("Args", (), {"credits": False, "mode": "search", "name": "warehouse", "limit": 5})()
+        self.assertIn('"q": "Buzz Oates"', stdout.getvalue())
+        payload = json.loads(stdout.getvalue().split("Dry run request:\n", 1)[1].split("\nCreate a key", 1)[0])
+        self.assertEqual(
+            payload["body"],
+            {"q": "Buzz Oates", "jurisdictions": "us_ca", "limit": 1},
         )
-        self.assertEqual(payload["body"]["jurisdictions"], "us_ca")
+        self.assertEqual(payload["url"], "https://api.govfiles.dev/v2/companies/search")
 
     def test_repository_does_not_contain_a_live_key(self):
         for path in ROOT.rglob("*"):
